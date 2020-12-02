@@ -1,0 +1,13 @@
+# Credentials
+credentials.json
+
+# Deprecated
+# .dolt/
+# .sqlhistory
+# test.csv
+
+# Virtual Environment
+venv/
+
+# Python Cache
+__pycache__
