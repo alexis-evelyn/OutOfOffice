@@ -5,6 +5,8 @@ import argparse
 import logging
 import twitter
 import json
+import datetime
+import humanize
 
 # Custom Log Levels
 from doltpy.core import system_helpers
@@ -34,10 +36,25 @@ def main(arguments: argparse.Namespace):
     with open("credentials.json", "r") as file:
         credentials = json.load(file)
 
-    run_search(credentials=credentials)
+    # Date/Time Out of Office Epoch
+    out_of_office = 1611162000
+
+    leaving = get_time_remaining(leaving=out_of_office)
+
+    logger.info(leaving)
+    run_search(credentials=credentials, leaving_countdown=leaving)
 
 
-def run_search(credentials: json):
+def get_time_remaining(leaving: int):
+    leaving_time = datetime.datetime.utcfromtimestamp(leaving)
+    current_time = datetime.datetime.utcnow()
+
+    remaining = leaving_time-current_time
+
+    return humanize.precisedelta(remaining)
+
+
+def run_search(credentials: json, leaving_countdown: str = None):
     api = twitter.Api(consumer_key=credentials['consumer']['key'],
                       consumer_secret=credentials['consumer']['secret'],
                       access_token_key=credentials['token']['key'],
