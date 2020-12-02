@@ -8,6 +8,7 @@ import twitter
 import json
 import datetime
 import humanize
+from os import path
 
 VERBOSE = logging.DEBUG - 1
 logging.addLevelName(VERBOSE, "VERBOSE")
@@ -55,7 +56,11 @@ def save_status_to_file(status_id: int):
 
 
 def read_status_from_file() -> int:
-    f = open("latest_status.json", "r")
+    file = "latest_status.json"
+    if not path.exists(file):
+        return None
+
+    f = open(file, "r")
     filecontents = f.read()
     f.close()
 
