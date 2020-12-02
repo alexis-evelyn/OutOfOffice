@@ -3,6 +3,8 @@
 import argparse
 # import pandas as pd
 import logging
+from json.decoder import JSONDecodeError
+
 import twitter
 import json
 import datetime
@@ -40,9 +42,40 @@ def main(arguments: argparse.Namespace):
     out_of_office = 1611162000
 
     leaving = get_time_remaining(leaving=out_of_office)
-
     logger.info(leaving)
-    run_search(credentials=credentials, leaving_countdown=leaving)
+
+    last_replied_status = read_status_from_file()
+    replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status)
+
+    if replied_to_status is not None:
+        save_status_to_file(replied_to_status)
+
+
+def save_status_to_file(status_id: int):
+    file_contents = {
+        "last_status": status_id
+    }
+
+    f = open("latest_status.json", "w")
+    f.write(json.dumps(file_contents))
+    f.close()
+
+
+def read_status_from_file() -> int:
+    f = open("latest_status.json", "r")
+    filecontents = f.read()
+    f.close()
+
+    # {"last_status": 1333984649056546816}
+    try:
+        decoded = json.loads(filecontents)
+
+        if 'last_status' not in decoded:
+            return None
+    except JSONDecodeError:
+        return None
+
+    return decoded['last_status']
 
 
 def get_time_remaining(leaving: int):
@@ -54,24 +87,25 @@ def get_time_remaining(leaving: int):
     return humanize.precisedelta(remaining)
 
 
-def run_search(credentials: json, leaving_countdown: str = None):
+def run_search(credentials: json, leaving_countdown: str, latest_status: int = None) -> int:
     api = twitter.Api(consumer_key=credentials['consumer']['key'],
                       consumer_secret=credentials['consumer']['secret'],
                       access_token_key=credentials['token']['key'],
                       access_token_secret=credentials['token']['secret'],
                       sleep_on_rate_limit=True)
 
-    mentions = api.GetMentions(since_id=1330087270569955337)
-    # logger.warning(mentions)
+    # user_id=25073877 is Donald Trump (@realDonaldTrump)
+    prez_statuses = api.GetUserTimeline(user_id=25073877, since_id=latest_status, count=1)
+    logger.warning(prez_statuses)
 
-    # [Status(ID=1330087270569955337, ScreenName=AlexEvelyn42, Created=Sat Nov 21 09:54:51 +0000 2020, Text='@DigitalRoverDog I forgot I used to have a bot on Twitter.')]
-    for mention in mentions:
-        new_status = "@{user} Hello {name}".format(name=mention.user.name, user=mention.user.screen_name)
-        logger.warning(new_status)
-        api.PostUpdate(in_reply_to_status_id=mention.id, status=new_status)
+    for prez_status in prez_statuses:
+        new_status = "@{user} {name} will be out of office in {countdown}".format(name=prez_status.user.name, user=prez_status.user.screen_name, countdown=leaving_countdown)
+        logger.debug(new_status)
 
-    # status = api.PostUpdate('Test Tweet From Python Twitter!')
-    # logger.warning(status.text)
+        api.PostUpdate(in_reply_to_status_id=prez_status.id, status=new_status)
+        return prez_status.id  # We only want to post once
+
+    return None
 
 
 if __name__ == '__main__':
