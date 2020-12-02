@@ -96,7 +96,6 @@ def run_search(credentials: json, leaving_countdown: str, latest_status: int = N
 
     # user_id=25073877 is Donald Trump (@realDonaldTrump)
     prez_statuses = api.GetUserTimeline(user_id=25073877, since_id=latest_status, count=1)
-    logger.warning(prez_statuses)
 
     for prez_status in prez_statuses:
         new_status = "@{user} {name} will be out of office in {countdown}".format(name=prez_status.user.name, user=prez_status.user.screen_name, countdown=leaving_countdown)
