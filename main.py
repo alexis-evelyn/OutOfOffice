@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import argparse
-# import pandas as pd
 import logging
 from json.decoder import JSONDecodeError
 
@@ -10,18 +9,13 @@ import json
 import datetime
 import humanize
 
-# Custom Log Levels
-from doltpy.core import system_helpers
-from doltpy.core.system_helpers import get_logger
-
 VERBOSE = logging.DEBUG - 1
 logging.addLevelName(VERBOSE, "VERBOSE")
 
-# Dolt Logger
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Argument Parser Setup
-parser = argparse.ArgumentParser(description='Arguments For Presidential Tweet Archiver')
+parser = argparse.ArgumentParser(description='Arguments For Out of Office Replier')
 parser.add_argument("-log", "--log", help="Set Log Level (Defaults to WARNING)",
                     dest='logLevel',
                     default='WARNING',
@@ -31,7 +25,6 @@ parser.add_argument("-log", "--log", help="Set Log Level (Defaults to WARNING)",
 
 def main(arguments: argparse.Namespace):
     # Set Logging Level
-    logging.Logger.setLevel(system_helpers.logger, arguments.logLevel)  # DoltPy's Log Level
     logger.setLevel(arguments.logLevel)  # This Script's Log Level
 
     # Setup For Twitter API
@@ -108,8 +101,5 @@ def run_search(credentials: json, leaving_countdown: str, latest_status: int = N
 
 
 if __name__ == '__main__':
-    # This is to get DoltPy's Logger To Shut Up When Running `this_script.py -h`
-    logging.Logger.setLevel(system_helpers.logger, logging.CRITICAL)
-
     args = parser.parse_args()
     main(args)

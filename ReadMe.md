@@ -1,5 +1,7 @@
 ### OSX
 
+# TODO: Fix requirements.txt to only have necessary requirements for this project
+
 ```bash
 sudo port install python38 py38-setuptools py38-setuptools py38-psycopg2 openssl
 
