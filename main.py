@@ -155,7 +155,6 @@ def draw_progress_bar(progress: float) -> PIL.Image:
         percentage_text = "{percent}% Complete".format(percent=round(progress, 2))
         text_length = int(25.384615384615385 * len(percentage_text))
         length = (im.size[0] - end_bar_length) + text_length
-        print(end_bar_length)
 
         draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=(int(200), int(50), int(0), 255))
 
