@@ -185,7 +185,17 @@ def draw_progress_bar(progress: float) -> PIL.Image:
         draw.rectangle(xy=(begin_limit, end_limit), fill=red_stripe, outline=black_border, width=1)
 
         # Draw White Progress Filled
-        # draw.rectangle(xy=(begin_limit, end_limit), fill=white_stripe, outline=black_border, width=1)
+        offset = (end_limit[1] - begin_limit[1])/13
+        for stripe in range(1, 13):
+            if stripe % 2 == 0:
+                continue
+
+            new_begin_limit = (begin_limit[0]+1, begin_limit[1] + (offset * stripe))
+            new_end_limit = (end_limit[0]-1, begin_limit[1] + (offset * (stripe+1)))
+
+            logger.debug("White Stripe Y Axis Coordinate: {}, {}".format(new_begin_limit[1], new_end_limit[1]))
+
+            draw.rectangle(xy=(new_begin_limit, new_end_limit), fill=white_stripe)
 
         # Draw Progress Bar Beginning
         begin_bar_length = get_bar_length(progress_bar=im, percentage=20)
@@ -198,12 +208,13 @@ def draw_progress_bar(progress: float) -> PIL.Image:
         text_length = int(25.384615384615385 * len(percentage_text))
         length = (im.size[0] - end_bar_length) + text_length
 
-        draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=(int(200), int(50), int(0), 255))
+        text_color = (0, 0, 0, 255)
+        draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=text_color)
 
         return im
 
 
-def round_corner(radius: tuple, fill: tuple, outer_corner_color: tuple = (0, 0, 0, 0)):
+def round_corner(radius: int, fill: tuple, outer_corner_color: tuple = (0, 0, 0, 0)):
     """Draw a round corner
         Stolen From: https://code-maven.com/slides/python/rectangle-with-rounded-corners
     """
