@@ -48,10 +48,10 @@ def main(arguments: argparse.Namespace):
     progress_bar = draw_progress_bar(percentage)
 
     last_replied_status = read_status_from_file()
-    replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status, image=progress_bar)
+    replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status, progress_bar=progress_bar)
 
-    # if replied_to_status is not None:
-    #     save_status_to_file(replied_to_status)
+    if replied_to_status is not None:
+        save_status_to_file(replied_to_status)
 
 
 def save_status_to_file(status_id: int):
