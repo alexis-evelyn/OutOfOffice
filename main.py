@@ -154,7 +154,7 @@ def draw_progress_bar(progress: float) -> PIL.Image:
 
     # Blue - #002868 (0, 40, 104)
     # Red - #BF0A30 (191, 10, 48)
-    with Image.new("RGBA", (1024, 128)) as im:
+    with Image.new("RGBA", (640, 128)) as im:
         draw = ImageDraw.Draw(im, 'RGBA')
 
         # Debug Progress (Percentage)
@@ -201,15 +201,36 @@ def draw_progress_bar(progress: float) -> PIL.Image:
         begin_bar_length = get_bar_length(progress_bar=im, percentage=20)
         round_rectangle(color=blue_canton, image=im, start=(begin_limit[0]+1, begin_limit[1]+1), end=(int(begin_bar_length-1), end_limit[1]))
 
-        # Write Text
+        # Write Text and Background Shading
         fnt = ImageFont.truetype("working/firacode/FiraCode-Bold.ttf", 40)
 
         percentage_text = "{percent}% Complete".format(percent=round(progress, 2))
         text_length = int(25.384615384615385 * len(percentage_text))
         length = (im.size[0] - end_bar_length) + text_length
 
-        text_color = (0, 0, 0, 255)
-        draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=text_color)
+        text_color = (0, 0, 255, 255)
+        shade_color = (0, 0, 0, 130)
+        text_start = (im.size[0]-length, (im.size[1]/2)-(37.5/2))
+        text_end = (end_limit[0], end_limit[1]-(37.5/2))
+
+        shaded_background = Image.new('RGBA', im.size, (0, 0, 0, 0))
+        shaded_background_draw = ImageDraw.Draw(shaded_background)
+
+        shaded_background_draw.rectangle(xy=(text_start, text_end), fill=shade_color)
+        im = Image.alpha_composite(im, shaded_background)
+
+        draw = ImageDraw.Draw(im)
+        draw.multiline_text(xy=text_start, text=percentage_text, font=fnt, fill=text_color)
+
+        # Paste Trump's Face
+        canton_begin_pos = (begin_limit[0]+1, begin_limit[1]+1)
+        canton_end_pos = (int(begin_bar_length-1), end_limit[1])
+        face_size = (int((canton_end_pos[0] - canton_begin_pos[0])/1.5), int((canton_end_pos[1] - canton_begin_pos[1])))
+        face_begin_pos = (int(canton_begin_pos[0] + (canton_end_pos[0]/6)), int(canton_begin_pos[1]))
+
+        face = Image.open("trump.png").convert("RGBA").resize(size=face_size)
+
+        im.paste(im=face, box=face_begin_pos)
 
         return im
 
