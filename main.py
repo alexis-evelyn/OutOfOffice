@@ -27,6 +27,12 @@ parser.add_argument("-log", "--log", help="Set Log Level (Defaults to WARNING)",
                     type=str.upper,
                     choices=['VERBOSE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
 
+parser.add_argument("-offline", "--offline", help="Disable Twitter and internet access for debugging the script",
+                    dest='isOffline',
+                    default='FALSE',
+                    type=str.upper,
+                    choices=['TRUE', 'FALSE'])
+
 
 def main(arguments: argparse.Namespace):
     # Set Logging Level
@@ -46,6 +52,12 @@ def main(arguments: argparse.Namespace):
 
     percentage = get_percentage_remaining(current=current_time, entry=in_office, leaving=out_of_office)
     progress_bar = draw_progress_bar(percentage)
+
+    # Allows Easy Disabling Of Twitter/Network Features For Testing
+    if arguments.isOffline == 'TRUE':
+        progress_bar.save("working/temp.png")
+        logger.warning("Tweeting Ability Disabled Due To Offline Parameter")
+        return
 
     last_replied_status = read_status_from_file()
     replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status, progress_bar=progress_bar)
@@ -132,22 +144,52 @@ def run_search(credentials: json, leaving_countdown: str, latest_status: int = N
     return None
 
 
+def get_bar_length(progress_bar: PIL.Image, percentage: float) -> float:
+    return (progress_bar.size[0]-10)*(percentage/100)
+
+
 def draw_progress_bar(progress: float) -> PIL.Image:
     if not os.path.exists('working'):
         os.makedirs('working')
 
+    # Blue - #002868 (0, 40, 104)
+    # Red - #BF0A30 (191, 10, 48)
     with Image.new("RGBA", (1024, 128)) as im:
         draw = ImageDraw.Draw(im, 'RGBA')
 
+        # Debug Progress (Percentage)
+        # progress = 0
+
+        # End Bar Length
+        end_bar_length = get_bar_length(progress_bar=im, percentage=progress)
+
+        # Border Limits
+        begin_limit = (10, 10)
+        end_limit = (end_bar_length, (im.size[1]-10))
+
+        # Colors
+        red_stripe = (191, 10, 48, 255)
+        white_stripe = (255, 255, 255, 255)
+        blue_canton = (0, 40, 104, 255)
+        black_border = (0, 0, 0, 255)
+        transparent_border = (0, 0, 0, 0)
+        unfilled_bar = (20, 20, 20, 255)
+
         # Fill With Transparent Background
-        draw.rectangle(xy=((0, 0), (im.size[0]-1, im.size[1]-1)), fill=(0, 0, 0, 0), outline=(0, 0, 0, 0), width=1)
+        draw.rectangle(xy=((0, 0), (im.size[0]-1, im.size[1]-1)), fill=transparent_border, outline=transparent_border, width=1)
 
-        # Draw Unfilled of Bar
-        draw.rectangle(xy=((10, 10), (im.size[0]-10, im.size[1]-10)), fill=(20, 20, 20, 255), outline=(0, 0, 0, 255), width=1)
+        # Draw Unfilled Bar
+        draw.rectangle(xy=(begin_limit, (im.size[0]-10, im.size[1]-10)), fill=unfilled_bar, outline=black_border, width=1)
 
-        # Draw Progress Filled
-        end_bar_length = (im.size[0]-10)*(progress/100)
-        draw.rectangle(xy=((10, 10), (end_bar_length, (im.size[1]-10))), fill=(10, 203, 200, 255), outline=(2, 56, 50, 255), width=1)
+        # Draw Red Progress Filled
+        draw.rectangle(xy=(begin_limit, end_limit), fill=red_stripe, outline=black_border, width=1)
+
+        # Draw White Progress Filled
+        # draw.rectangle(xy=(begin_limit, end_limit), fill=white_stripe, outline=black_border, width=1)
+
+        # Draw Progress Bar Beginning
+        begin_bar_length = get_bar_length(progress_bar=im, percentage=20)
+        round_rectangle(color=blue_canton, image=im, start=(begin_limit[0]+1, begin_limit[1]+1), end=(int(begin_bar_length-1), end_limit[1]))
 
         # Write Text
         fnt = ImageFont.truetype("working/firacode/FiraCode-Bold.ttf", 40)
@@ -159,6 +201,53 @@ def draw_progress_bar(progress: float) -> PIL.Image:
         draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=(int(200), int(50), int(0), 255))
 
         return im
+
+
+def round_corner(radius: tuple, fill: tuple, outer_corner_color: tuple = (0, 0, 0, 0)):
+    """Draw a round corner
+        Stolen From: https://code-maven.com/slides/python/rectangle-with-rounded-corners
+    """
+    corner = Image.new("RGBA", (radius, radius), outer_corner_color)
+
+    # Corner
+    draw = ImageDraw.Draw(corner)
+    draw.pieslice((0, 0, radius * 2, radius * 2), 180, 270, fill=fill)
+
+    return corner
+
+
+def round_rectangle(color: tuple, image: PIL.Image, start: tuple, end: tuple):
+    """Draw a rounded rectangle
+        Modified From: https://code-maven.com/slides/python/rectangle-with-rounded-corners
+    """
+    # Corner Colors Outside
+    left_corners_outer_color = (0, 0, 0, 255)
+    right_corners_outer_color = (0, 0, 0, 0)
+
+    radius = 10
+    left_corners = round_corner(radius=radius, fill=color, outer_corner_color=left_corners_outer_color)
+    right_corners = round_corner(radius=radius, fill=color, outer_corner_color=right_corners_outer_color)
+
+    image.paste(im=left_corners, box=start, mask=left_corners)  # Top Left
+    image.paste(im=left_corners.rotate(90), box=(start[0], end[1]-radius), mask=left_corners.rotate(90))  # Bottom Left
+
+    image.paste(im=right_corners.rotate(270), box=(end[0], start[1]), mask=right_corners.rotate(270))  # Top Right
+    image.paste(im=right_corners.rotate(180), box=(end[0], end[1]-radius), mask=right_corners.rotate(180))  # Bottom Right
+
+    # Start Drawing
+    draw = ImageDraw.Draw(image, 'RGBA')
+
+    # Inside Rectangle (Vertical)
+    v_rect_start = (start[0]+radius, start[1])
+    v_rect_end = (end[0], end[1]-1)
+    draw.rectangle(xy=(v_rect_start, v_rect_end), fill=color)
+
+    # Left Rectangle (Horizontal)
+    h_rect_start = (start[0], start[1]+radius)
+    h_rect_end = (end[0]+radius-1, end[1]-radius)
+    draw.rectangle(xy=(h_rect_start, h_rect_end), fill=color)
+
+    return image
 
 
 if __name__ == '__main__':
