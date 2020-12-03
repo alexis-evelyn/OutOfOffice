@@ -3,14 +3,16 @@
 import argparse
 import logging
 import os
-import random
 from json.decoder import JSONDecodeError
 
+import PIL
 import twitter
 import json
 import datetime
 import humanize
 from os import path
+
+from PIL import ImageFont, ImageDraw, Image
 
 VERBOSE = logging.DEBUG - 1
 logging.addLevelName(VERBOSE, "VERBOSE")
@@ -40,12 +42,13 @@ def main(arguments: argparse.Namespace):
     current_time = int(datetime.datetime.utcnow().timestamp())
 
     leaving = get_time_remaining(current=current_time, leaving=out_of_office)
-    percentage = get_percentage_remaining(current=current_time, entry=in_office, leaving=out_of_office)
-
     logger.info("Leaving Office: {}".format(leaving))
 
+    percentage = get_percentage_remaining(current=current_time, entry=in_office, leaving=out_of_office)
+    progress_bar = draw_progress_bar(percentage)
+
     last_replied_status = read_status_from_file()
-    # replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status)
+    replied_to_status = run_search(credentials=credentials, leaving_countdown=leaving, latest_status=last_replied_status, image=progress_bar)
 
     # if replied_to_status is not None:
     #     save_status_to_file(replied_to_status)
@@ -82,7 +85,7 @@ def read_status_from_file() -> int:
     return decoded['last_status']
 
 
-def get_percentage_remaining(entry: int, leaving: int, current: int):
+def get_percentage_remaining(entry: int, leaving: int, current: int) -> float:
     entry_time = datetime.datetime.utcfromtimestamp(entry)
     leaving_time = datetime.datetime.utcfromtimestamp(leaving)
     current_time = datetime.datetime.utcfromtimestamp(current)
@@ -90,6 +93,7 @@ def get_percentage_remaining(entry: int, leaving: int, current: int):
     percentage = (current_time - entry_time) / (leaving_time - entry_time) * 100
 
     logger.info("Percentage Remaining: {}".format(percentage))
+    return percentage
 
 
 def get_time_remaining(current: int, leaving: int):
@@ -101,7 +105,7 @@ def get_time_remaining(current: int, leaving: int):
     return humanize.precisedelta(remaining)
 
 
-def run_search(credentials: json, leaving_countdown: str, latest_status: int = None) -> int:
+def run_search(credentials: json, leaving_countdown: str, latest_status: int = None, progress_bar: PIL.Image = None) -> int:
     api = twitter.Api(consumer_key=credentials['consumer']['key'],
                       consumer_secret=credentials['consumer']['secret'],
                       access_token_key=credentials['token']['key'],
@@ -115,45 +119,47 @@ def run_search(credentials: json, leaving_countdown: str, latest_status: int = N
         new_status = "@{user} {name} will be out of office in {countdown}".format(name=prez_status.user.name, user=prez_status.user.screen_name, countdown=leaving_countdown)
         logger.debug(new_status)
 
-        api.PostUpdate(in_reply_to_status_id=prez_status.id, status=new_status)
+        if progress_bar is None:
+            api.PostUpdate(in_reply_to_status_id=prez_status.id, status=new_status)
+        else:
+            # Write To File
+            progress_bar.save("working/temp.png", "PNG")
+            api.PostUpdate(in_reply_to_status_id=prez_status.id, status=new_status, media="working/temp.png")
+            os.remove("working/temp.png")
+
         return prez_status.id  # We only want to post once
 
     return None
 
 
-def draw_progress_bar(api: twitter.Api, status: twitter.models.Status):
+def draw_progress_bar(progress: float) -> PIL.Image:
     if not os.path.exists('working'):
         os.makedirs('working')
 
-    with Image.new("RGB", (1024, 1024)) as im:
-        draw = ImageDraw.Draw(im)
+    with Image.new("RGBA", (1024, 128)) as im:
+        draw = ImageDraw.Draw(im, 'RGBA')
 
-        # random.seed(time.time())
-        r = random.random()*255
-        g = random.random()*255
-        b = random.random()*255
+        # Fill With Transparent Background
+        draw.rectangle(xy=((0, 0), (im.size[0]-1, im.size[1]-1)), fill=(0, 0, 0, 0), outline=(0, 0, 0, 0), width=1)
 
-        for x in range(0, im.size[0]):
-            for y in range(0, im.size[0]):
-                im.putpixel((x, y), (int(random.random()*r), int(random.random()*g), int(random.random()*b)))
+        # Draw Unfilled of Bar
+        draw.rectangle(xy=((10, 10), (im.size[0]-10, im.size[1]-10)), fill=(20, 20, 20, 255), outline=(0, 0, 0, 255), width=1)
 
-        # draw.line((0, 0) + im.size, fill=128)
-        # draw.line((0, im.size[1], im.size[0], 0), fill=128)
+        # Draw Progress Filled
+        end_bar_length = (im.size[0]-10)*(progress/100)
+        draw.rectangle(xy=((10, 10), (end_bar_length, (im.size[1]-10))), fill=(10, 203, 200, 255), outline=(2, 56, 50, 255), width=1)
 
-        # αℓєχιѕ єνєℓуη 🏳️‍⚧️ 🏳️‍🌈
-        # Zero Width Joiner (ZWJ) does not seem to be supported, need to find a font that works with it to confirm it
-        # fnt = ImageFont.truetype("working/symbola/Symbola-AjYx.ttf", 40)
+        # Write Text
         fnt = ImageFont.truetype("working/firacode/FiraCode-Bold.ttf", 40)
-        name = "Digital Rover"  # status.user.name
-        draw.multiline_text((im.size[0]-330, im.size[1]-50), name, font=fnt, fill=(int(255 - r), int(255 - g), int(255 - b)))
 
-        # write to file like object
-        # output = io.BytesIO()  # Why does the PostUpdate not work with general bytesio?
-        im.save("working/temp.png", "PNG")
+        percentage_text = "{percent}% Complete".format(percent=round(progress, 2))
+        text_length = int(25.384615384615385 * len(percentage_text))
+        length = (im.size[0] - end_bar_length) + text_length
+        print(end_bar_length)
 
-        new_status = "@{user}".format(user=status.user.screen_name)
-        api.PostUpdate(in_reply_to_status_id=status.id, status=new_status, media="working/temp.png")
-        os.remove("working/temp.png")  # Remove temporary file
+        draw.multiline_text((im.size[0]-length, (im.size[1]/2)-(37.5/2)), percentage_text, font=fnt, fill=(int(200), int(50), int(0), 255))
+
+        return im
 
 
 if __name__ == '__main__':
