@@ -6,6 +6,6 @@ while true; do
   echo "Checking For New Tweets"
   python3 main.py --log=info
 
-  echo "Waiting 1 Minute"
-  sleep $((1*60))
+  echo "Waiting 30 Minutes"
+  sleep $((30*60))
 done
